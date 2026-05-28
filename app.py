@@ -88,6 +88,9 @@ def get_projects_by_client(client_id):
 st.title("🎬 イニシエ 管理システム")
 page = st.sidebar.radio("メニュー", ["👥 クライアント管理", "📁 案件管理", "🔒 人事管理", "🏠 マイページ"])
 st.sidebar.markdown("---")
+if st.sidebar.button("🔄 データを更新"):
+    query_db.clear()
+    st.rerun()
 st.sidebar.caption("イニシエ株式会社")
 
 # ========== クライアント管理 ==========
