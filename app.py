@@ -61,10 +61,14 @@ def query_db(db_id, filters=None, sorts=None):
     return res.json().get("results", [])
 
 def create_page(db_id, props):
-    requests.post("https://api.notion.com/v1/pages", headers=HEADERS,
+    res = requests.post("https://api.notion.com/v1/pages", headers=HEADERS,
         json={"parent": {"database_id": db_id}, "properties": props})
     time.sleep(1)
     query_db.clear()
+    if res.status_code != 200:
+        st.error(f"登録エラー: {res.json().get('message', res.status_code)}")
+        return False
+    return True
 
 def update_page(page_id, props):
     requests.patch(f"https://api.notion.com/v1/pages/{page_id}", headers=HEADERS, json={"properties": props})
