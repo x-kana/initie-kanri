@@ -51,6 +51,7 @@ def get_text(prop, key):
         return ""
     return ""
 
+@st.cache_data(ttl=60)
 def query_db(db_id, filters=None, sorts=None):
     body = {}
     if filters: body["filter"] = filters
@@ -61,9 +62,11 @@ def query_db(db_id, filters=None, sorts=None):
 def create_page(db_id, props):
     requests.post("https://api.notion.com/v1/pages", headers=HEADERS,
         json={"parent": {"database_id": db_id}, "properties": props})
+    query_db.clear()
 
 def update_page(page_id, props):
     requests.patch(f"https://api.notion.com/v1/pages/{page_id}", headers=HEADERS, json={"properties": props})
+    query_db.clear()
 
 # ---- データ取得 ----
 def get_clients():
