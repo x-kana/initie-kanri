@@ -359,18 +359,22 @@ elif page == "🔒 人事管理":
                         new_phone   = st.text_input("電話番号", value=phone, key=f"ep_{emp['id']}")
                         new_notes   = st.text_input("備考",     value=notes, key=f"eno_{emp['id']}")
 
+                    login_pw = get_text(p, "ログインパスワード")
+                    new_login_pw = st.text_input("🔑 マイページ用パスワード", value=login_pw, key=f"epw_{emp['id']}")
+
                     if st.button("💾 保存", key=f"esv_{emp['id']}"):
                         update_page(emp["id"], {
-                            "氏名":     {"title": [{"text": {"content": new_name}}]},
-                            "役職":     {"select": {"name": new_role}},
-                            "雇用形態": {"select": {"name": new_hire}},
-                            "基本給":   {"number": new_salary if new_salary > 0 else None},
-                            "時給":     {"number": new_hourly if new_hourly > 0 else None},
-                            "交通費":   {"number": new_commute if new_commute > 0 else None},
-                            "振込口座": {"rich_text": [{"text": {"content": new_bank}}]},
-                            "メール":   {"email": new_email or None},
-                            "電話番号": {"phone_number": new_phone or None},
-                            "備考":     {"rich_text": [{"text": {"content": new_notes}}]},
+                            "氏名":               {"title": [{"text": {"content": new_name}}]},
+                            "役職":               {"select": {"name": new_role}},
+                            "雇用形態":           {"select": {"name": new_hire}},
+                            "基本給":             {"number": new_salary if new_salary > 0 else None},
+                            "時給":               {"number": new_hourly if new_hourly > 0 else None},
+                            "交通費":             {"number": new_commute if new_commute > 0 else None},
+                            "振込口座":           {"rich_text": [{"text": {"content": new_bank}}]},
+                            "メール":             {"email": new_email or None},
+                            "電話番号":           {"phone_number": new_phone or None},
+                            "備考":               {"rich_text": [{"text": {"content": new_notes}}]},
+                            "ログインパスワード": {"rich_text": [{"text": {"content": new_login_pw}}]},
                         })
                         st.success("保存しました")
                         st.rerun()
