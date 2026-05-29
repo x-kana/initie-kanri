@@ -356,73 +356,68 @@ elif page == "🔒 人事管理":
 
     tab1, tab2, tab3, tab4 = st.tabs(["👤 従業員一覧", "🕐 勤怠管理", "💴 給与管理", "➕ 新規登録"])
 
-        with tab1:
-            employees = query_db(EMPLOYEE_DB_ID, sorts=[{"property": "氏名", "direction": "ascending"}])
-            st.write(f"**{len(employees)} 名**")
+    with tab1:
+        employees = query_db(EMPLOYEE_DB_ID, sorts=[{"property": "氏名", "direction": "ascending"}])
+        st.write(f"**{len(employees)} 名**")
+        for emp in employees:
+            p = emp["properties"]
+            name    = get_text(p, "氏名")
+            role    = get_text(p, "役職")
+            hire    = get_text(p, "雇用形態")
+            salary  = p.get("基本給", {}).get("number")
+            hourly  = p.get("時給", {}).get("number")
+            commute = p.get("交通費", {}).get("number")
+            bank    = get_text(p, "振込口座")
+            email   = get_text(p, "メール")
+            phone   = get_text(p, "電話番号")
+            notes   = get_text(p, "備考")
+            pay_str = f"基本給 ¥{salary:,.0f}" if salary else (f"時給 ¥{hourly:,.0f}" if hourly else "未設定")
+            with st.expander(f"👤 {name}　`{role}`　{pay_str}"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_name   = st.text_input("氏名",   value=name,  key=f"en_{emp['id']}")
+                    new_role   = st.selectbox("役職", ["代表","社員","パート","業務委託"],
+                        index=["代表","社員","パート","業務委託"].index(role) if role in ["代表","社員","パート","業務委託"] else 1,
+                        key=f"er_{emp['id']}")
+                    new_hire   = st.selectbox("雇用形態", ["正社員","パート","業務委託"],
+                        index=["正社員","パート","業務委託"].index(hire) if hire in ["正社員","パート","業務委託"] else 0,
+                        key=f"eh_{emp['id']}")
+                    new_salary = st.number_input("基本給（月額）", value=float(salary) if salary else 0.0, step=1000.0, key=f"es_{emp['id']}")
+                    new_hourly = st.number_input("時給", value=float(hourly) if hourly else 0.0, step=10.0, key=f"ew_{emp['id']}")
+                with col2:
+                    new_commute  = st.number_input("交通費（月額）", value=float(commute) if commute else 0.0, step=100.0, key=f"ec_{emp['id']}")
+                    new_bank     = st.text_input("振込口座", value=bank,  key=f"eb_{emp['id']}")
+                    new_email    = st.text_input("メール",   value=email, key=f"ee_{emp['id']}")
+                    new_phone    = st.text_input("電話番号", value=phone, key=f"ep_{emp['id']}")
+                    new_notes    = st.text_input("備考",     value=notes, key=f"eno_{emp['id']}")
+                col3, col4 = st.columns(2)
+                with col3:
+                    emp_role_val = get_text(p, "権限")
+                    new_emp_role = st.selectbox("権限", ["一般","管理者"],
+                        index=["一般","管理者"].index(emp_role_val) if emp_role_val in ["一般","管理者"] else 0,
+                        key=f"erl_{emp['id']}")
+                with col4:
+                    login_pw     = get_text(p, "ログインパスワード")
+                    new_login_pw = st.text_input("🔑 ログインパスワード", value=login_pw, key=f"epw_{emp['id']}")
+                if st.button("💾 保存", key=f"esv_{emp['id']}"):
+                    update_page(emp["id"], {
+                        "氏名":               {"title": [{"text": {"content": new_name}}]},
+                        "役職":               {"select": {"name": new_role}},
+                        "雇用形態":           {"select": {"name": new_hire}},
+                        "基本給":             {"number": new_salary if new_salary > 0 else None},
+                        "時給":               {"number": new_hourly if new_hourly > 0 else None},
+                        "交通費":             {"number": new_commute if new_commute > 0 else None},
+                        "振込口座":           {"rich_text": [{"text": {"content": new_bank}}]},
+                        "メール":             {"email": new_email or None},
+                        "電話番号":           {"phone_number": new_phone or None},
+                        "備考":               {"rich_text": [{"text": {"content": new_notes}}]},
+                        "権限":               {"select": {"name": new_emp_role}},
+                        "ログインパスワード": {"rich_text": [{"text": {"content": new_login_pw}}]},
+                    })
+                    st.success("保存しました")
+                    st.rerun()
 
-            for emp in employees:
-                p = emp["properties"]
-                name     = get_text(p, "氏名")
-                role     = get_text(p, "役職")
-                hire     = get_text(p, "雇用形態")
-                salary   = p.get("基本給", {}).get("number")
-                hourly   = p.get("時給", {}).get("number")
-                commute  = p.get("交通費", {}).get("number")
-                bank     = get_text(p, "振込口座")
-                email    = get_text(p, "メール")
-                phone    = get_text(p, "電話番号")
-                notes    = get_text(p, "備考")
-
-                pay_str = f"基本給 ¥{salary:,.0f}" if salary else (f"時給 ¥{hourly:,.0f}" if hourly else "未設定")
-
-                with st.expander(f"👤 {name}　`{role}`　{pay_str}"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        new_name    = st.text_input("氏名",     value=name,  key=f"en_{emp['id']}")
-                        new_role    = st.selectbox("役職", ["代表","社員","パート","業務委託"],
-                            index=["代表","社員","パート","業務委託"].index(role) if role in ["代表","社員","パート","業務委託"] else 1,
-                            key=f"er_{emp['id']}")
-                        new_hire    = st.selectbox("雇用形態", ["正社員","パート","業務委託"],
-                            index=["正社員","パート","業務委託"].index(hire) if hire in ["正社員","パート","業務委託"] else 0,
-                            key=f"eh_{emp['id']}")
-                        new_salary  = st.number_input("基本給（月額）", value=float(salary) if salary else 0.0, step=1000.0, key=f"es_{emp['id']}")
-                        new_hourly  = st.number_input("時給", value=float(hourly) if hourly else 0.0, step=10.0, key=f"ew_{emp['id']}")
-                    with col2:
-                        new_commute = st.number_input("交通費（月額）", value=float(commute) if commute else 0.0, step=100.0, key=f"ec_{emp['id']}")
-                        new_bank    = st.text_input("振込口座", value=bank,  key=f"eb_{emp['id']}")
-                        new_email   = st.text_input("メール",   value=email, key=f"ee_{emp['id']}")
-                        new_phone   = st.text_input("電話番号", value=phone, key=f"ep_{emp['id']}")
-                        new_notes   = st.text_input("備考",     value=notes, key=f"eno_{emp['id']}")
-
-                    col3, col4 = st.columns(2)
-                    with col3:
-                        emp_role_val = get_text(p, "権限")
-                        new_emp_role = st.selectbox("権限", ["一般", "管理者"],
-                            index=["一般","管理者"].index(emp_role_val) if emp_role_val in ["一般","管理者"] else 0,
-                            key=f"erl_{emp['id']}")
-                    with col4:
-                        login_pw = get_text(p, "ログインパスワード")
-                        new_login_pw = st.text_input("🔑 ログインパスワード", value=login_pw, key=f"epw_{emp['id']}")
-
-                    if st.button("💾 保存", key=f"esv_{emp['id']}"):
-                        update_page(emp["id"], {
-                            "氏名":               {"title": [{"text": {"content": new_name}}]},
-                            "役職":               {"select": {"name": new_role}},
-                            "雇用形態":           {"select": {"name": new_hire}},
-                            "基本給":             {"number": new_salary if new_salary > 0 else None},
-                            "時給":               {"number": new_hourly if new_hourly > 0 else None},
-                            "交通費":             {"number": new_commute if new_commute > 0 else None},
-                            "振込口座":           {"rich_text": [{"text": {"content": new_bank}}]},
-                            "メール":             {"email": new_email or None},
-                            "電話番号":           {"phone_number": new_phone or None},
-                            "備考":               {"rich_text": [{"text": {"content": new_notes}}]},
-                            "権限":               {"select": {"name": new_emp_role}},
-                            "ログインパスワード": {"rich_text": [{"text": {"content": new_login_pw}}]},
-                        })
-                        st.success("保存しました")
-                        st.rerun()
-
-        with tab2:
+    with tab2:
             st.markdown("### 勤怠入力")
             employees = query_db(EMPLOYEE_DB_ID, sorts=[{"property": "氏名", "direction": "ascending"}])
             emp_options = {get_text(e["properties"], "氏名"): e["id"] for e in employees}
@@ -470,7 +465,7 @@ elif page == "🔒 人事管理":
             else:
                 st.info("勤怠データがありません")
 
-        with tab3:
+    with tab3:
             st.markdown("### 給与計算")
             employees = query_db(EMPLOYEE_DB_ID, sorts=[{"property": "氏名", "direction": "ascending"}])
             emp_map = {get_text(e["properties"], "氏名"): e for e in employees}
@@ -573,7 +568,7 @@ elif page == "🔒 人事管理":
             else:
                 st.info("給与データがありません")
 
-        with tab4:
+    with tab4:
             st.markdown("### 新規従業員登録")
             col1, col2 = st.columns(2)
             with col1:
@@ -620,121 +615,121 @@ elif page == "🏠 マイページ":
 
     tab_p, tab_pay, tab_att, tab_task = st.tabs(["👤 プロフィール", "💴 給与明細", "🕐 勤怠履歴", "✅ タスク"])
 
-        # ---- プロフィール ----
-        with tab_p:
-            ep = emp_data["properties"] if emp_data else {}
-            role    = get_text(ep, "役職")
-            hire    = get_text(ep, "雇用形態")
-            start   = get_text(ep, "入社日")
-            email   = get_text(ep, "メール")
-            phone   = get_text(ep, "電話番号")
+    # ---- プロフィール ----
+    with tab_p:
+        ep = emp_data["properties"] if emp_data else {}
+        role    = get_text(ep, "役職")
+        hire    = get_text(ep, "雇用形態")
+        start   = get_text(ep, "入社日")
+        email   = get_text(ep, "メール")
+        phone   = get_text(ep, "電話番号")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("氏名", user["name"])
-                st.metric("役職", role or "未設定")
-                st.metric("雇用形態", hire or "未設定")
-            with col2:
-                st.metric("入社日", start or "未設定")
-                st.metric("メール", email or "未設定")
-                st.metric("電話番号", phone or "未設定")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("氏名", user["name"])
+            st.metric("役職", role or "未設定")
+            st.metric("雇用形態", hire or "未設定")
+        with col2:
+            st.metric("入社日", start or "未設定")
+            st.metric("メール", email or "未設定")
+            st.metric("電話番号", phone or "未設定")
 
-        # ---- 給与明細 ----
-        with tab_pay:
-            payrolls = query_db(PAYROLL_DB_ID,
-                filters={"property": "従業員", "relation": {"contains": user["id"]}},
-                sorts=[{"property": "対象年月", "direction": "descending"}]
-            )
-            if not payrolls:
-                st.info("給与明細がまだありません")
-            else:
-                for r in payrolls:
-                    p = r["properties"]
-                    month    = get_text(p, "対象年月")[:7] if get_text(p, "対象年月") else "不明"
-                    base     = p.get("基本給", {}).get("number", 0) or 0
-                    over     = p.get("残業代", {}).get("number", 0) or 0
-                    commute  = p.get("交通費", {}).get("number", 0) or 0
-                    allow    = p.get("各種手当", {}).get("number", 0) or 0
-                    ins      = p.get("社会保険控除", {}).get("number", 0) or 0
-                    tax      = p.get("所得税控除", {}).get("number", 0) or 0
-                    gross    = p.get("支給総額", {}).get("number", 0) or 0
-                    net      = p.get("振込金額", {}).get("number", 0) or 0
-                    status   = get_text(p, "振込状況")
-                    pay_date = get_text(p, "振込日")
-                    icon     = "🟢" if status == "振込済" else "🟡"
+    # ---- 給与明細 ----
+    with tab_pay:
+        payrolls = query_db(PAYROLL_DB_ID,
+            filters={"property": "従業員", "relation": {"contains": user["id"]}},
+            sorts=[{"property": "対象年月", "direction": "descending"}]
+        )
+        if not payrolls:
+            st.info("給与明細がまだありません")
+        else:
+            for r in payrolls:
+                p = r["properties"]
+                month    = get_text(p, "対象年月")[:7] if get_text(p, "対象年月") else "不明"
+                base     = p.get("基本給", {}).get("number", 0) or 0
+                over     = p.get("残業代", {}).get("number", 0) or 0
+                commute  = p.get("交通費", {}).get("number", 0) or 0
+                allow    = p.get("各種手当", {}).get("number", 0) or 0
+                ins      = p.get("社会保険控除", {}).get("number", 0) or 0
+                tax      = p.get("所得税控除", {}).get("number", 0) or 0
+                gross    = p.get("支給総額", {}).get("number", 0) or 0
+                net      = p.get("振込金額", {}).get("number", 0) or 0
+                status   = get_text(p, "振込状況")
+                pay_date = get_text(p, "振込日")
+                icon     = "🟢" if status == "振込済" else "🟡"
 
-                    with st.expander(f"{icon} {month}　振込金額: ¥{net:,.0f}　`{status}`"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.markdown("**支給**")
-                            st.write(f"基本給　　¥{base:,.0f}")
-                            st.write(f"残業代　　¥{over:,.0f}")
-                            st.write(f"交通費　　¥{commute:,.0f}")
-                            st.write(f"各種手当　¥{allow:,.0f}")
-                            st.markdown(f"**支給総額　¥{gross:,.0f}**")
-                        with col2:
-                            st.markdown("**控除**")
-                            st.write(f"社会保険　¥{ins:,.0f}")
-                            st.write(f"所得税　　¥{tax:,.0f}")
-                            st.markdown(f"**控除合計　¥{ins+tax:,.0f}**")
-                            st.divider()
-                            st.markdown(f"#### 振込金額　¥{net:,.0f}")
-                            if pay_date:
-                                st.caption(f"振込日: {pay_date}")
+                with st.expander(f"{icon} {month}　振込金額: ¥{net:,.0f}　`{status}`"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown("**支給**")
+                        st.write(f"基本給　　¥{base:,.0f}")
+                        st.write(f"残業代　　¥{over:,.0f}")
+                        st.write(f"交通費　　¥{commute:,.0f}")
+                        st.write(f"各種手当　¥{allow:,.0f}")
+                        st.markdown(f"**支給総額　¥{gross:,.0f}**")
+                    with col2:
+                        st.markdown("**控除**")
+                        st.write(f"社会保険　¥{ins:,.0f}")
+                        st.write(f"所得税　　¥{tax:,.0f}")
+                        st.markdown(f"**控除合計　¥{ins+tax:,.0f}**")
+                        st.divider()
+                        st.markdown(f"#### 振込金額　¥{net:,.0f}")
+                        if pay_date:
+                            st.caption(f"振込日: {pay_date}")
 
-        # ---- 勤怠履歴 ----
-        with tab_att:
-            attendances = query_db(ATTENDANCE_DB_ID,
-                filters={"property": "従業員", "relation": {"contains": user["id"]}},
-                sorts=[{"property": "対象年月", "direction": "descending"}]
-            )
-            if not attendances:
-                st.info("勤怠データがまだありません")
-            else:
-                for r in attendances:
-                    p = r["properties"]
-                    month = get_text(p, "対象年月")[:7] if get_text(p, "対象年月") else "不明"
-                    days  = p.get("出勤日数", {}).get("number", 0) or 0
-                    hours = p.get("労働時間", {}).get("number", 0) or 0
-                    over  = p.get("残業時間", {}).get("number", 0) or 0
-                    paid  = p.get("有給取得日数", {}).get("number", 0) or 0
-                    note  = get_text(p, "備考")
+    # ---- 勤怠履歴 ----
+    with tab_att:
+        attendances = query_db(ATTENDANCE_DB_ID,
+            filters={"property": "従業員", "relation": {"contains": user["id"]}},
+            sorts=[{"property": "対象年月", "direction": "descending"}]
+        )
+        if not attendances:
+            st.info("勤怠データがまだありません")
+        else:
+            for r in attendances:
+                p = r["properties"]
+                month = get_text(p, "対象年月")[:7] if get_text(p, "対象年月") else "不明"
+                days  = p.get("出勤日数", {}).get("number", 0) or 0
+                hours = p.get("労働時間", {}).get("number", 0) or 0
+                over  = p.get("残業時間", {}).get("number", 0) or 0
+                paid  = p.get("有給取得日数", {}).get("number", 0) or 0
+                note  = get_text(p, "備考")
 
-                    with st.expander(f"📅 {month}　出勤: {days}日　労働: {hours}h　残業: {over}h"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.metric("出勤日数", f"{days}日")
-                            st.metric("労働時間", f"{hours}h")
-                        with col2:
-                            st.metric("残業時間", f"{over}h")
-                            st.metric("有給取得", f"{paid}日")
-                        if note:
-                            st.caption(f"備考: {note}")
+                with st.expander(f"📅 {month}　出勤: {days}日　労働: {hours}h　残業: {over}h"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("出勤日数", f"{days}日")
+                        st.metric("労働時間", f"{hours}h")
+                    with col2:
+                        st.metric("残業時間", f"{over}h")
+                        st.metric("有給取得", f"{paid}日")
+                    if note:
+                        st.caption(f"備考: {note}")
 
-        # ---- タスク ----
-        with tab_task:
-            tasks = query_db(TASK_DB_ID,
-                filters={"property": "従業員", "relation": {"contains": user["id"]}},
-                sorts=[{"property": "期日", "direction": "ascending"}]
-            )
-            if not tasks:
-                st.info("アサインされたタスクがありません")
-            else:
-                doing  = [t for t in tasks if get_text(t["properties"], "ステータス") == "進行中"]
-                todo   = [t for t in tasks if get_text(t["properties"], "ステータス") == "未着手"]
-                done   = [t for t in tasks if get_text(t["properties"], "ステータス") == "完了"]
+    # ---- タスク ----
+    with tab_task:
+        tasks = query_db(TASK_DB_ID,
+            filters={"property": "従業員", "relation": {"contains": user["id"]}},
+            sorts=[{"property": "期日", "direction": "ascending"}]
+        )
+        if not tasks:
+            st.info("アサインされたタスクがありません")
+        else:
+            doing  = [t for t in tasks if get_text(t["properties"], "ステータス") == "進行中"]
+            todo   = [t for t in tasks if get_text(t["properties"], "ステータス") == "未着手"]
+            done   = [t for t in tasks if get_text(t["properties"], "ステータス") == "完了"]
 
-                col1, col2, col3 = st.columns(3)
-                col1.metric("未着手", len(todo))
-                col2.metric("進行中", len(doing))
-                col3.metric("完了", len(done))
+            col1, col2, col3 = st.columns(3)
+            col1.metric("未着手", len(todo))
+            col2.metric("進行中", len(doing))
+            col3.metric("完了", len(done))
 
-                st.divider()
-                for t in doing + todo + done:
-                    p = t["properties"]
-                    name   = get_text(p, "タスク名")
-                    status = get_text(p, "ステータス")
-                    due    = get_text(p, "期日")
-                    icon   = STATUS_COLORS.get(status, "⚪")
-                    due_str = f"　期日: {due}" if due else ""
-                    st.write(f"{icon} {name}　`{status}`{due_str}")
+            st.divider()
+            for t in doing + todo + done:
+                p = t["properties"]
+                name   = get_text(p, "タスク名")
+                status = get_text(p, "ステータス")
+                due    = get_text(p, "期日")
+                icon   = STATUS_COLORS.get(status, "⚪")
+                due_str = f"　期日: {due}" if due else ""
+                st.write(f"{icon} {name}　`{status}`{due_str}")
