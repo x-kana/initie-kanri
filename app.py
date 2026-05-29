@@ -12,15 +12,14 @@ def get_secret(key, default=""):
     except:
         return os.getenv(key, default)
 
-API_KEY         = get_secret("NOTION_API_KEY")
-CLIENT_DB_ID    = get_secret("NOTION_CLIENT_DB_ID")
-PROJECT_DB_ID   = get_secret("NOTION_PROJECT_DB_ID")
-TASK_DB_ID      = get_secret("NOTION_TASK_DB_ID")
-INVOICE_DB_ID   = get_secret("NOTION_INVOICE_DB_ID")
-EMPLOYEE_DB_ID  = get_secret("NOTION_EMPLOYEE_DB_ID")
+API_KEY          = get_secret("NOTION_API_KEY")
+CLIENT_DB_ID     = get_secret("NOTION_CLIENT_DB_ID")
+PROJECT_DB_ID    = get_secret("NOTION_PROJECT_DB_ID")
+TASK_DB_ID       = get_secret("NOTION_TASK_DB_ID")
+INVOICE_DB_ID    = get_secret("NOTION_INVOICE_DB_ID")
+EMPLOYEE_DB_ID   = get_secret("NOTION_EMPLOYEE_DB_ID")
 ATTENDANCE_DB_ID = get_secret("NOTION_ATTENDANCE_DB_ID")
-PAYROLL_DB_ID   = get_secret("NOTION_PAYROLL_DB_ID")
-HR_PASSWORD     = get_secret("HR_PASSWORD", "initie2026")
+PAYROLL_DB_ID    = get_secret("NOTION_PAYROLL_DB_ID")
 
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
@@ -88,12 +87,62 @@ def get_tasks_by_project(project_id):
 def get_projects_by_client(client_id):
     return query_db(PROJECT_DB_ID, filters={"property": "クライアント", "relation": {"contains": client_id}})
 
-# ---- ナビゲーション ----
+# ---- 認証 ----
 st.title("🎬 イニシエ 管理システム")
-page = st.sidebar.radio("メニュー", ["👥 クライアント管理", "📁 案件管理", "🔒 人事管理", "🏠 マイページ"])
+
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+def login_screen():
+    st.subheader("ログイン")
+    col1, col2 = st.columns(2)
+    with col1:
+        email = st.text_input("メールアドレス")
+    with col2:
+        pw = st.text_input("パスワード", type="password")
+    if st.button("ログイン", type="primary"):
+        employees = query_db(EMPLOYEE_DB_ID)
+        matched = None
+        for e in employees:
+            e_email = get_text(e["properties"], "メール")
+            e_pw    = get_text(e["properties"], "ログインパスワード")
+            if e_email == email and e_pw == pw and e_pw != "":
+                matched = e
+                break
+        if matched:
+            st.session_state.user = {
+                "id":    matched["id"],
+                "name":  get_text(matched["properties"], "氏名"),
+                "email": email,
+                "role":  get_text(matched["properties"], "権限"),
+            }
+            st.rerun()
+        else:
+            st.error("メールアドレスまたはパスワードが違います")
+
+if not st.session_state.user:
+    login_screen()
+    st.stop()
+
+# ログイン済みのナビゲーション
+user = st.session_state.user
+is_admin = user["role"] == "管理者"
+
+st.sidebar.markdown(f"👤 **{user['name']}**")
+st.sidebar.caption(f"{user['email']}")
+st.sidebar.markdown("---")
+
+menu_items = ["👥 クライアント管理", "📁 案件管理", "🏠 マイページ"]
+if is_admin:
+    menu_items.insert(2, "🔒 人事管理")
+
+page = st.sidebar.radio("メニュー", menu_items)
 st.sidebar.markdown("---")
 if st.sidebar.button("🔄 データを更新"):
     query_db.clear()
+    st.rerun()
+if st.sidebar.button("🚪 ログアウト"):
+    st.session_state.user = None
     st.rerun()
 st.sidebar.caption("イニシエ株式会社")
 
@@ -301,25 +350,11 @@ elif page == "📁 案件管理":
 # ========== 人事管理 ==========
 elif page == "🔒 人事管理":
     st.subheader("🔒 人事管理")
+    if not is_admin:
+        st.error("このページへのアクセス権限がありません")
+        st.stop()
 
-    if "hr_authenticated" not in st.session_state:
-        st.session_state.hr_authenticated = False
-
-    if not st.session_state.hr_authenticated:
-        st.warning("このページはアクセス制限されています")
-        pw = st.text_input("パスワードを入力", type="password")
-        if st.button("ログイン"):
-            if pw == HR_PASSWORD:
-                st.session_state.hr_authenticated = True
-                st.rerun()
-            else:
-                st.error("パスワードが違います")
-    else:
-        if st.sidebar.button("🔓 ログアウト"):
-            st.session_state.hr_authenticated = False
-            st.rerun()
-
-        tab1, tab2, tab3, tab4 = st.tabs(["👤 従業員一覧", "🕐 勤怠管理", "💴 給与管理", "➕ 新規登録"])
+    tab1, tab2, tab3, tab4 = st.tabs(["👤 従業員一覧", "🕐 勤怠管理", "💴 給与管理", "➕ 新規登録"])
 
         with tab1:
             employees = query_db(EMPLOYEE_DB_ID, sorts=[{"property": "氏名", "direction": "ascending"}])
@@ -359,8 +394,15 @@ elif page == "🔒 人事管理":
                         new_phone   = st.text_input("電話番号", value=phone, key=f"ep_{emp['id']}")
                         new_notes   = st.text_input("備考",     value=notes, key=f"eno_{emp['id']}")
 
-                    login_pw = get_text(p, "ログインパスワード")
-                    new_login_pw = st.text_input("🔑 マイページ用パスワード", value=login_pw, key=f"epw_{emp['id']}")
+                    col3, col4 = st.columns(2)
+                    with col3:
+                        emp_role_val = get_text(p, "権限")
+                        new_emp_role = st.selectbox("権限", ["一般", "管理者"],
+                            index=["一般","管理者"].index(emp_role_val) if emp_role_val in ["一般","管理者"] else 0,
+                            key=f"erl_{emp['id']}")
+                    with col4:
+                        login_pw = get_text(p, "ログインパスワード")
+                        new_login_pw = st.text_input("🔑 ログインパスワード", value=login_pw, key=f"epw_{emp['id']}")
 
                     if st.button("💾 保存", key=f"esv_{emp['id']}"):
                         update_page(emp["id"], {
@@ -374,6 +416,7 @@ elif page == "🔒 人事管理":
                             "メール":             {"email": new_email or None},
                             "電話番号":           {"phone_number": new_phone or None},
                             "備考":               {"rich_text": [{"text": {"content": new_notes}}]},
+                            "権限":               {"select": {"name": new_emp_role}},
                             "ログインパスワード": {"rich_text": [{"text": {"content": new_login_pw}}]},
                         })
                         st.success("保存しました")
@@ -569,55 +612,17 @@ elif page == "🔒 人事管理":
 # ========== マイページ ==========
 elif page == "🏠 マイページ":
     st.subheader("🏠 マイページ")
+    st.markdown(f"### こんにちは、{user['name']} さん")
 
-    if "emp_logged_in" not in st.session_state:
-        st.session_state.emp_logged_in = False
-        st.session_state.emp_id = None
-        st.session_state.emp_name = ""
-        st.session_state.emp_data = None
+    # ログイン済みユーザーのemployeeデータを取得
+    employees = query_db(EMPLOYEE_DB_ID)
+    emp_data = next((e for e in employees if e["id"] == user["id"]), None)
 
-    if not st.session_state.emp_logged_in:
-        st.info("氏名とパスワードを入力してください")
-        col1, col2 = st.columns(2)
-        with col1:
-            login_name = st.text_input("氏名")
-        with col2:
-            login_pw = st.text_input("パスワード", type="password")
-
-        if st.button("ログイン", type="primary"):
-            employees = query_db(EMPLOYEE_DB_ID)
-            matched = None
-            for e in employees:
-                name = get_text(e["properties"], "氏名")
-                pw   = get_text(e["properties"], "ログインパスワード")
-                if name == login_name and pw == login_pw and pw != "":
-                    matched = e
-                    break
-            if matched:
-                st.session_state.emp_logged_in = True
-                st.session_state.emp_id = matched["id"]
-                st.session_state.emp_name = login_name
-                st.session_state.emp_data = matched
-                st.rerun()
-            else:
-                st.error("氏名またはパスワードが正しくありません")
-    else:
-        col_title, col_logout = st.columns([4, 1])
-        with col_title:
-            st.markdown(f"### こんにちは、{st.session_state.emp_name} さん")
-        with col_logout:
-            if st.button("ログアウト"):
-                st.session_state.emp_logged_in = False
-                st.session_state.emp_id = None
-                st.session_state.emp_name = ""
-                st.session_state.emp_data = None
-                st.rerun()
-
-        tab_p, tab_pay, tab_att, tab_task = st.tabs(["👤 プロフィール", "💴 給与明細", "🕐 勤怠履歴", "✅ タスク"])
+    tab_p, tab_pay, tab_att, tab_task = st.tabs(["👤 プロフィール", "💴 給与明細", "🕐 勤怠履歴", "✅ タスク"])
 
         # ---- プロフィール ----
         with tab_p:
-            ep = st.session_state.emp_data["properties"]
+            ep = emp_data["properties"] if emp_data else {}
             role    = get_text(ep, "役職")
             hire    = get_text(ep, "雇用形態")
             start   = get_text(ep, "入社日")
@@ -626,7 +631,7 @@ elif page == "🏠 マイページ":
 
             col1, col2 = st.columns(2)
             with col1:
-                st.metric("氏名", st.session_state.emp_name)
+                st.metric("氏名", user["name"])
                 st.metric("役職", role or "未設定")
                 st.metric("雇用形態", hire or "未設定")
             with col2:
@@ -637,7 +642,7 @@ elif page == "🏠 マイページ":
         # ---- 給与明細 ----
         with tab_pay:
             payrolls = query_db(PAYROLL_DB_ID,
-                filters={"property": "従業員", "relation": {"contains": st.session_state.emp_id}},
+                filters={"property": "従業員", "relation": {"contains": user["id"]}},
                 sorts=[{"property": "対象年月", "direction": "descending"}]
             )
             if not payrolls:
@@ -680,7 +685,7 @@ elif page == "🏠 マイページ":
         # ---- 勤怠履歴 ----
         with tab_att:
             attendances = query_db(ATTENDANCE_DB_ID,
-                filters={"property": "従業員", "relation": {"contains": st.session_state.emp_id}},
+                filters={"property": "従業員", "relation": {"contains": user["id"]}},
                 sorts=[{"property": "対象年月", "direction": "descending"}]
             )
             if not attendances:
@@ -709,7 +714,7 @@ elif page == "🏠 マイページ":
         # ---- タスク ----
         with tab_task:
             tasks = query_db(TASK_DB_ID,
-                filters={"property": "従業員", "relation": {"contains": st.session_state.emp_id}},
+                filters={"property": "従業員", "relation": {"contains": user["id"]}},
                 sorts=[{"property": "期日", "direction": "ascending"}]
             )
             if not tasks:
